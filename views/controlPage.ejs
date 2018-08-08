@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title><%= title %></title>
+    <meta charset="UTF-8">
+    <!-- 引入样式 -->
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+    <!-- 先引入 Vue -->
+    <script src="https://unpkg.com/vue/dist/vue.js"></script>
+    <!-- 引入组件库 -->
+    <script src="https://unpkg.com/element-ui/lib/index.js"></script>
+    <script src="https://cdn.bootcss.com/axios/0.17.1/axios.min.js"></script>
+    <script src="/javascripts/formatJSON.js"></script>
+    <link rel='stylesheet' href='/stylesheets/style.css'/>
+</head>
+<body>
+<div id="app" v-loading="loading" v-cloak >
+    <el-row :gutter="20">
+        <el-col :span='8'>
+            <el-collapse v-model="activeName" @change="handleChange" accordion>
+                <el-collapse-item v-for="(item,index) in configDataList" :name="index">
+                    <template slot="title">
+                        {{item.title}}
+                        <el-button v-if="!item.apiList.length" @click="removePro(index)" type="text" size="small" style="color:#ff5722">删除</el-button>
+                    </template>
+                    <p v-for="v in item.apiList">
+                        <el-button @click="btnClick(v)" type="text" size="small">{{v.url}}</el-button>
+                        <el-button type="text" size="small" style="color:rgb(233, 89, 239)" @click="openTarget(v)">地址</el-button>
+                        <el-button type="text" size="small" style="color:#ff9800" @click="removeUrl(v,index)">删除</el-button>
+                    </p>
+                    <!--新增接口地址-->
+                    <el-button @click="dialogShow(index)" type="primary" icon="el-icon-plus" plain size="mini" >接口</el-button>
+                </el-collapse-item>
+            </el-collapse>
+            <!--新增项目-->
+            <el-button style="margin-top: 10px" @click="dialogProVisible = true" icon="el-icon-circle-plus-outline" type="primary" size="mini">项目</el-button>
+        </el-col>
+        <el-col :span='16'>
+            <!--右侧展示窗-->
+            <el-input  v-model="apiDataCont" type="textarea" :rows="25" placeholder="接口返回值"></el-input>
+            <p>{{currentUrl}}</p>
+            <el-button @click="modifySubmit()" type="primary" size="mini" style="margin-top: 10px;">提交修改结果</el-button>
+        </el-col>
+    </el-row>
+    <!--弹窗 新增接口-->
+    <el-dialog title="增加新接口" :visible.sync="dialogVisible">
+        <p>接口名</p>
+        <el-input v-model="dialogInput" type="text"></el-input>
+        <div slot="footer" class="dialog-footer">
+            <el-button @click="dialogVisible = false">取 消</el-button>
+            <el-button type="primary" @click="dialogSubmit">确 定</el-button>
+        </div>
+    </el-dialog>
+    <!--弹窗 新增项目-->
+    <el-dialog title="增加新项目" :visible.sync="dialogProVisible">
+        <p>项目名</p>
+        <el-input v-model="dialogProInput" type="text"></el-input>
+        <div slot="footer" class="dialog-footer">
+            <el-button @click="dialogProVisible = false">取 消</el-button>
+            <el-button type="primary" @click="dialogProSubmit">确 定</el-button>
+        </div>
+    </el-dialog>
+
+
+
+</div>
+<script>
+  var id = 1000;
+  var vm = new Vue({
+    el: '#app',
+    name: 'app',
+    created() {
+      this.initConfigData();
+      this.initLocalStorage();
+    },
+    data: function () {
+      return {
+        loading:false,
+        currentUrl:'',
+//弹窗 新增接口
+        dialogVisible: false,
+        currentAddIndex:0,
+        dialogInput: '',
+        //弹窗 新增项目
+        dialogProVisible:false,
+        dialogProInput: '',
+
+        activeName: 1,
+        apiDataCont: '',
+        configDataList: [{
+          title: '供应商管理2.0',
+          apiList: [{
+            url: '/supplier/delay/getSupplierFullInfo'
+          }, {
+            url: '/supplier/delay/getFlowFullInfo'
+          }, {
+            url: '/supplier/getFlowFullInfo'
+          }]
+        }, {
+          title: '供应商管理2.0',
+          apiList: [{
+            url: '/supplier/delay/getSupplierFullInfo'
+          }, {
+            url: '/supplier/delay/getFlowFullInfo'
+          }, {
+            url: '/supplier/getFlowFullInfo'
+          }]
+        }]
+      }
+    },
+    watch:{
+      'configDataList':{
+        handler:function(newData){
+          var _this = this;
+          _this.loading = true;
+          axios.post('/config/setData',newData).then(function (res) {
+            _this.loading = false;
+            var d = res.data||{};
+            if(!d.ret){
+              _this.$message({
+                type:'error',
+                message:d.msg
+              })
+            }
+          }).catch(function (e) {
+            _this.loading = false;
+            console.error(e)
+          })
+        },
+        deep:true
+      }
+    },
+    methods: {
+      openTarget(v){
+        window.open(v.url,'_blank')
+      },
+      initLocalStorage(){
+        if(localStorage.meicaiNodeApi){
+
+          this.activeName = +localStorage.meicaiNodeApi;
+        }
+      },
+      modifySubmit(){
+        var _this = this;
+        var params = {
+          url:_this.currentUrl,
+          data:_this.apiDataCont.replace(/[\n\s]/g,'')
+        }
+        _this.loading = true;
+        axios.post('/config/updateApiCont',params).then(function (res) {
+          _this.loading = false;
+          var d = res.data||{};
+          if(!d.ret){
+            _this.$message({
+              type:'error',
+              message:d.msg
+            })
+          }
+        }).catch(function (e) {
+          _this.loading = false;
+          console.error(e)
+        })
+
+      },
+      removePro(index){
+        this.configDataList.splice(index,1)
+      },
+      dialogProSubmit(){
+        this.configDataList.push({
+          title: this.dialogProInput,
+          apiList: []
+        });
+        this.dialogProVisible = false;
+        this.dialogProInput = '';
+      },
+      removeUrl(obj,parentIndex){
+        var _this = this;
+        _this.$confirm('确定删除该接口地址?', '删除', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }).then(() => {
+          var arr = _this.configDataList[parentIndex].apiList;
+          var index = arr.indexOf(obj);
+          if(index>-1){
+            arr.splice(index,1);
+          }
+        }).catch(() => {
+
+        });
+
+      },
+      dialogShow(index) {
+        console.log(index)
+        this.currentAddIndex = index;
+        this.dialogVisible = true;
+      },
+      getApiNameList(){
+        var _tempArr = [];
+        this.configDataList.forEach(v=>{
+          _tempArr = _tempArr.concat(v.apiList);
+        })
+        return _tempArr;
+      },
+      //新增接口 提交数据
+      dialogSubmit() {
+        var _this = this;
+        var arr = _this.getApiNameList().filter(v=>{
+          return v.url == _this.dialogInput
+        })
+        if(arr.length){
+          _this.$message({
+            type:"error",
+            message:"该接口地址已存在"
+          })
+          return;
+        }
+        _this.configDataList[_this.currentAddIndex].apiList.push({
+          url:_this.dialogInput
+        })
+        _this.dialogInput = '';
+        _this.dialogVisible = false;
+      },
+      initConfigData() {
+        var _this = this;
+        _this.loading = true;
+        axios.get('/config/getData').then(function (res) {
+          _this.loading = false;
+          var d = res.data||{};
+          console.log(res)
+          if(d.ret){
+            _this.configDataList = d.data
+          }
+        }).catch(function (e) {
+          _this.loading = false;
+          console.error(e)
+        })
+      },
+      btnClick(v) {
+        var _this = this;
+        _this.apiDataCont = '';
+        _this.currentUrl = v.url;
+        _this.loading = true;
+        axios.post(v.url, {}).then(function (res) {
+          _this.loading = false;
+          _this.apiDataCont = format(JSON.stringify(res.data))
+        }).catch(function (e) {
+          _this.loading = false;
+          console.error(e)
+        })
+      },
+      handleChange(index) {
+        localStorage.meicaiNodeApi = index;
+      },
+      handleNodeClick(data) {
+        console.log(data);
+      },
+      append(data) {
+        const newChild = {id: id++, label: 'testtest', children: []};
+        if (!data.children) {
+          this.$set(data, 'children', []);
+        }
+        data.children.push(newChild);
+      },
+
+    }
+
+  })
+</script>
+</body>
+</html>
